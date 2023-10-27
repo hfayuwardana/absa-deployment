@@ -151,7 +151,7 @@ def get_output_format(tokenizer, sentence, model, max_length, tags, type):
     result = []
     for word, tag in zip(sentence.split(), predicted_tags):
         result.append(f'{word} {tag}')
-    return (result, predicted_tags)
+    return result
 
 def preprocess_sentence(original_sentence):
     # mencari tanda baca yang tidak diikuti spasi
@@ -175,7 +175,8 @@ def main():
     # ======================================================================== SET VARIABLE ========================================================================
     # load model
     aspect_model = load_my_model('resource/ASPECT-ONLY_EXPERIMENT-9')
-    sentiment_model = load_my_model('resource/SENTIMENT-ONLY_EXPERIMENT-4')
+    # sentiment_model = load_my_model('resource/SENTIMENT-ONLY_EXPERIMENT-4')
+    sentiment_model = load_my_model('resource/SENTIMENT-ONLY_EXPERIMENT-6-c3')
 
     # load tokenizer
     tokenizer = load_tokenizer('resource/tokenizer.pickle')
@@ -221,17 +222,17 @@ def main():
             
         col2a, col2b = st.columns(2)
         with col2a:
-            if st.button("Clear", use_container_width=True, on_click=clear_input):
+            if st.button("Hapus", use_container_width=True, on_click=clear_input):
                 processed = 0
         with col2b:
-            if st.button("Submit", use_container_width=True, type="primary"):
+            if st.button("Prediksi", use_container_width=True, type="primary"):
                 processed = 1
 
     with col2:
         if processed == 1:
 
-            output_aspect, _ = get_output_format(tokenizer, text_input, aspect_model, MAX_LENGTH, aspect_tags, 'a')
-            output_sentiment, _ = get_output_format(tokenizer, text_input, sentiment_model, MAX_LENGTH, sentiment_tags, 's')
+            output_aspect = get_output_format(tokenizer, text_input, aspect_model, MAX_LENGTH, aspect_tags, 'a')
+            output_sentiment = get_output_format(tokenizer, text_input, sentiment_model, MAX_LENGTH, sentiment_tags, 's')
 
             all_token = []
             all_aspect = []
@@ -278,11 +279,6 @@ def main():
             sentiment_label = "<div class='container'><span class='label-font'>Sentimen 🎭</span></div>"
             div_sentiment = f"<div class='output2'>{sentiment_label} {div}</div>"
             st.markdown(div_sentiment, unsafe_allow_html=True)
-
-            # st.markdown("<div class='container'><span class='label-font'>Aspek</span></div>", unsafe_allow_html=True)
-            # st.markdown(div, unsafe_allow_html=True)
-            # st.markdown("<div class='container2'><span class='label-font'>Sentimen</span></div>", unsafe_allow_html=True)
-            # st.markdown(div, unsafe_allow_html=True)
     
     # examples:
     st.markdown("<div class='container3'><span class='label-font'>Contoh</span></div>", unsafe_allow_html=True)
