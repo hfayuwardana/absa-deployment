@@ -1,0 +1,44 @@
+/* custom CSS */
+
+.stTextArea, .output, .output2 {
+    background-color: #f7f7f7;
+    padding: 7px;
+    border-radius: 7px;
+    border: 1px solid #EDEDED;
+}
+
+.stTextArea [data-baseweb=base-input] {
+    background-color: #ffffff;
+    border-radius: 7px;
+    border: 2.5px solid #EDEDED;
+}
+
+.custom-div {
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 7px;
+    margin: 0px;
+    min-height: 100px;
+    border: 2.5px solid #EDEDED;
+}
+
+.container, .container2 {
+    margin: 3.25px;
+}
+
+.container3 {
+    margin-top: 3rem;
+}
+
+.output {
+    padding-bottom: 0.8em;
+}
+
+.output2 {
+    margin-top: 17px;
+}
+
+.label-font {
+    margin: 0;
+    font-size: 14px !important;
+}
