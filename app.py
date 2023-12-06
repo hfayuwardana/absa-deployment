@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import re
+import time
 
 st.set_page_config(
     page_title='Analisis Sentimen Berbasis Aspek pada Ulasan Produk Elektronik Laptop',
@@ -46,30 +47,35 @@ def highlight_token(text, label):
     span_end = '</span>'
     idx = 0
     highlighted_text = []
+    prev_label = None
     text_len = len(text)
 
-    curr_asp = ''
+    curr_label = 'O'
 
     list_token = [] # untuk menyimpan akumulasi token-token sebelumnya
     status = 1 # default status (status = 1): menyimpan. status = 0: mencetak dengan span. status = 2: mencetak tanpa span.
 
     for token, token_label in zip(text, label):
         if idx == 0:
-            prev_asp = ''
+            prev_label = 'O'
         else:
-            prev_asp = curr_asp
-        curr_asp = token_label
+            prev_label = curr_label
+        curr_label = token_label
 
-        if curr_asp == 'O':
-            if prev_asp != 'O' and prev_asp != '':
+        if curr_label == 'O':
+            if prev_label != 'O':
                 status = 0
             else:
                 status = 2
         else:
-            if prev_asp == 'O':
+            if prev_label == 'O':
                 status = 2
             else:
-                status = 1
+                if curr_label == prev_label:
+                    status = 1
+                else:
+                    status = 0
+        # st.write(str(token) + "->" + str(token_label) + "->" + str(status))
         idx += 1
 
         # TAMPUNG
@@ -79,7 +85,7 @@ def highlight_token(text, label):
         elif status == 0:  
             # lakukan membuat span
             tokens = " ".join(list_token)
-            new_span = f'{set_outer_span(prev_asp)} {tokens} {set_inner_span(prev_asp)} {prev_asp} {span_end} {span_end}'
+            new_span = f'{set_outer_span(prev_label)} {tokens} {set_inner_span(prev_label)} {prev_label} {span_end} {span_end}'
             highlighted_text.append(new_span)
 
             # reset ulang variabel
@@ -99,42 +105,56 @@ def highlight_token(text, label):
 
         # CETAK KHUSUS INDEX TERAKHIR
         if idx-1 == text_len-1:
-            if curr_asp == 'O':
+            if curr_label == 'O':
                 new_span = f'{token}'
                 highlighted_text.append(new_span)
             else:
                 tokens = " ".join(list_token)
-                new_span = f'{set_outer_span(curr_asp)} {tokens} {set_inner_span(curr_asp)} {curr_asp} {span_end} {span_end}'
+                new_span = f'{set_outer_span(curr_label)} {tokens} {set_inner_span(curr_label)} {curr_label} {span_end} {span_end}'
                 highlighted_text.append(new_span)
 
     result = ' '.join(highlighted_text)
     div = f"<div class='custom-div'>{result}</div>"
     return div
 
-@st.cache_resource
+@st.cache_resource(show_spinner="Memuat model...")
 def load_my_model(model_path):
     model = tf.keras.models.load_model(model_path)
+
+    msg = st.success('Model berhasil dimuat!', icon="✅")
+    time.sleep(3)
+    msg.empty()
+
     return model
 
-@st.cache_resource
+@st.cache_resource(show_spinner="Memuat tokenizer...")
 def load_tokenizer(tokenizer_path):
     with open(tokenizer_path, 'rb') as handle:
         tokenizer = pickle.load(handle)
     handle.close()
+
+    msg = st.success('Tokenizer berhasil dimuat!', icon="✅")  
+    time.sleep(3)
+    msg.empty()
+
     return tokenizer
 
-@st.cache_data
+@st.cache_data(show_spinner="Melakukan prediksi aspek...")
 def aspect_predict(_model, input):
     return _model.predict(input)
 
-@st.cache_data
+@st.cache_data(show_spinner="Melakukan prediksi sentimen...")
 def sentiment_predict(_model, input):
     return _model.predict(input)
 
-def get_output_format(tokenizer, sentence, model, max_length, tags, type):
-    sentence = preprocess_sentence(sentence)
-    sentence_seq = tokenizer.texts_to_sequences([sentence])
+def preprocess_input(tokenizer, sentence, max_length):
+    sentence_preprocessed = add_space(sentence)
+    sentence_seq = tokenizer.texts_to_sequences([sentence_preprocessed])
     sentence_padded = pad_sequences(sentence_seq, maxlen=max_length, padding='post', truncating='post')
+    return (sentence_preprocessed, sentence_padded)
+
+def get_output(tokenizer, sentence, model, max_length, tags, type):
+    sentence_preprocessed, sentence_padded = preprocess_input(tokenizer, sentence, max_length)
     predictions = []
 
     if type == 'a': # 'a' for aspect
@@ -149,11 +169,26 @@ def get_output_format(tokenizer, sentence, model, max_length, tags, type):
         predicted_tags.append(result_tag)
 
     result = []
-    for word, tag in zip(sentence.split(), predicted_tags):
+    for word, tag in zip(sentence_preprocessed.split(), predicted_tags):
         result.append(f'{word} {tag}')
-    return result
+    # st.write(result)
 
-def preprocess_sentence(original_sentence):
+    all_token = []
+    all_label = []
+    for i in result:
+        res = i.split(' ')
+        token = res[0]
+        label = None
+        if len(res[1]) > 1:
+            label = res[1][-3:]
+        else:
+            label = res[1]
+        all_token.append(token)
+        all_label.append(label)
+    
+    return (all_token, all_label)
+
+def add_space(original_sentence):
     # mencari tanda baca yang tidak diikuti spasi
     pattern = r'(?<=[,.!?\(\)-/\'\"▪️%~:;@#$^&*_+=])|(?=[,.!?\(\)-/\'\"▪️%~:;@#$^&*_+=])'
     new_sentence = re.sub(pattern, ' ', original_sentence)
@@ -175,7 +210,6 @@ def main():
     # ======================================================================== SET VARIABLE ========================================================================
     # load model
     aspect_model = load_my_model('resource/ASPECT-ONLY_EXPERIMENT-9')
-    # sentiment_model = load_my_model('resource/SENTIMENT-ONLY_EXPERIMENT-4')
     sentiment_model = load_my_model('resource/SENTIMENT-ONLY_EXPERIMENT-6-c3')
 
     # load tokenizer
@@ -218,41 +252,20 @@ def main():
     col1, col2 = st.columns(2)
     with col1:
         input_val = ''
-        text_input = st.text_area(label="Text 📝", placeholder="Masukkan ulasan...", value=input_val, key='text')
+        text_input = st.text_area(label="Text 📝", placeholder="Masukkan ulasan...", value=input_val, key='text', max_chars=600)
             
         col2a, col2b = st.columns(2)
         with col2a:
             if st.button("Hapus", use_container_width=True, on_click=clear_input):
                 processed = 0
         with col2b:
-            if st.button("Prediksi", use_container_width=True, type="primary"):
+            if st.button("Prediksi", use_container_width=True, type="primary") and len(text_input) != 0:
                 processed = 1
 
     with col2:
         if processed == 1:
-
-            output_aspect = get_output_format(tokenizer, text_input, aspect_model, MAX_LENGTH, aspect_tags, 'a')
-            output_sentiment = get_output_format(tokenizer, text_input, sentiment_model, MAX_LENGTH, sentiment_tags, 's')
-
-            all_token = []
-            all_aspect = []
-            all_sentiment = []
-            for i in output_aspect:
-                res = i.split(' ')
-                token = res[0]
-                if len(res[1]) > 1:
-                    label = res[1][-3:]
-                else:
-                    label = res[1]
-                all_token.append(token)
-                all_aspect.append(label)
-            for i in output_sentiment:
-                res = i.split(' ')
-                if len(res[1]) > 1:
-                    label = res[1][-3:]
-                else:
-                    label = res[1]
-                all_sentiment.append(label)
+            all_token, all_aspect = get_output(tokenizer, text_input, aspect_model, MAX_LENGTH, aspect_tags, 'a')
+            _, all_sentiment = get_output(tokenizer, text_input, sentiment_model, MAX_LENGTH, sentiment_tags, 's')
 
             # st.write(all_token)
             # st.write(all_aspect)
